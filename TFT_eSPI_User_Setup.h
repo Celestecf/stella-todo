@@ -12,6 +12,9 @@
 #define TFT_HEIGHT 320
 
 // ---- Display SPI pins (HSPI) ----
+// Display on the HSPI peripheral so it doesn't collide with the touch
+// controller, which the sketch runs on VSPI.
+#define USE_HSPI_PORT
 #define TFT_MISO 12
 #define TFT_MOSI 13
 #define TFT_SCLK 14

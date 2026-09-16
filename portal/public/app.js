@@ -1,9 +1,31 @@
 // Stella's Day parent portal
 
-const ICONS = {
-  toothbrush: "🪥", shirt: "👕", cereal: "🥣", soccer: "⚽",
-  books: "📚", heart: "❤️", flower: "🌸",
+// Icon name -> emoji. Names must match ICON_TABLE in the firmware's icons.h.
+const ICON_GROUPS = {
+  "Routine": {
+    toothbrush: "🪥", hairbrush: "🪮", shirt: "👕", cereal: "🥣", backpack: "🎒",
+    vitamin: "💊", pencil: "✏️", homework: "📝", books: "📚", shower: "🚿",
+    bath: "🛁", bed: "🛏️", moon: "🌙", sun: "☀️", clock: "⏰", socks: "🧦",
+    shoes: "👟", coat: "🧥", pajamas: "👚", laundry: "🧺", trash: "🗑️",
+    dishes: "🍽️", toys: "🧸", plant: "🪴", water: "💧", milk: "🥛",
+    apple: "🍎", lunch: "🥪", banana: "🍌",
+  },
+  "Pets": { dog: "🐶", cat: "🐱", fish: "🐟" },
+  "Activities": {
+    soccer: "⚽", ballet: "🩰", swim: "🏊", bike: "🚲", piano: "🎹", music: "🎵",
+    basketball: "🏀", tennis: "🎾", gymnastics: "🤸", dance: "💃", art: "🎨",
+    game: "🎮", tv: "📺", tablet: "📱",
+  },
+  "Places & events": {
+    school: "🏫", bus: "🚌", car: "🚗", doctor: "🩺", dentist: "🦷",
+    gift: "🎁", cake: "🎂", party: "🎉", umbrella: "☂️",
+  },
+  "Fun": {
+    heart: "❤️", flower: "🌸", star: "⭐", sparkles: "✨", rainbow: "🌈",
+    unicorn: "🦄", medal: "🏅", smile: "😊",
+  },
 };
+const ICONS = Object.assign({}, ...Object.values(ICON_GROUPS));
 const DAY_NAMES = ["S", "M", "T", "W", "T", "F", "S"];
 
 const $ = (sel) => document.querySelector(sel);
@@ -114,12 +136,16 @@ function scheduleSave() {
 
 // ---------- routine ----------
 
-function iconSelect(current, onchange) {
+function iconSelect(current, onchange, withNames = false) {
   const sel = el("select", { class: "icon-pick", onchange: (e) => onchange(e.target.value) });
-  for (const [key, emoji] of Object.entries(ICONS)) {
-    const o = el("option", { value: key }, `${emoji}`);
-    if (key === current) o.selected = true;
-    sel.append(o);
+  for (const [group, icons] of Object.entries(ICON_GROUPS)) {
+    const og = el("optgroup", { label: group });
+    for (const [key, emoji] of Object.entries(icons)) {
+      const o = el("option", { value: key }, withNames ? `${emoji} ${key}` : emoji);
+      if (key === current) o.selected = true;
+      og.append(o);
+    }
+    sel.append(og);
   }
   return sel;
 }
@@ -192,8 +218,7 @@ function renderEventForm() {
   sec.value = "after_school";
 
   const ic = $("#ev-icon");
-  ic.innerHTML = "";
-  for (const [key, emoji] of Object.entries(ICONS)) ic.append(el("option", { value: key }, `${emoji} ${key}`));
+  ic.replaceChildren(...iconSelect("soccer", () => {}, true).children);
   ic.value = "soccer";
 
   $("#ev-date").value = todayYMD();

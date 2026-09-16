@@ -91,12 +91,9 @@ int curSection = 0;
 int curOffset  = 0;
 
 const uint16_t* iconFor(const char* name) {
-  if (!strcmp(name, "toothbrush")) return icon_toothbrush;
-  if (!strcmp(name, "shirt"))      return icon_shirt;
-  if (!strcmp(name, "cereal"))     return icon_cereal;
-  if (!strcmp(name, "soccer"))     return icon_soccer;
-  if (!strcmp(name, "books"))      return icon_books;
-  if (!strcmp(name, "flower"))     return icon_flower;
+  for (int i = 0; i < ICON_COUNT; i++) {
+    if (!strcmp(name, ICON_TABLE[i].name)) return ICON_TABLE[i].data;
+  }
   return icon_heart;
 }
 
@@ -152,14 +149,13 @@ bool fetchToday() {
   http.begin(client, String(API_BASE) + "/api/today");
   http.addHeader("X-Device-Key", DEVICE_KEY);
   int code = http.GET();
+  Serial.printf("GET /api/today -> %d (free heap %u)\n", code, ESP.getFreeHeap());
   bool ok = false;
   if (code == 200) {
     String body = http.getString();
     dataChanged = (body != lastBody);
     ok = dataChanged ? parseToday(body) : true;
     if (ok) lastBody = body;
-  } else {
-    Serial.printf("GET /api/today -> %d\n", code);
   }
   http.end();
   return ok;
@@ -204,6 +200,23 @@ void drawCheckbox(TFT_eSprite& s, int x, int y, bool done) {
   }
 }
 
+// Try to split text into two lines at a word boundary so both fit in maxW
+// using the current font. Returns false if no split works.
+bool splitTwoLines(TFT_eSprite& s, const char* text, int maxW, char* l1, char* l2, size_t n) {
+  int len = strlen(text);
+  // Try the space closest to the middle first, then work outwards
+  for (int d = 0; d < len; d++) {
+    for (int sign = -1; sign <= 1; sign += 2) {
+      int i = len / 2 + sign * d;
+      if (i <= 0 || i >= len || text[i] != ' ') continue;
+      strlcpy(l1, text, min((size_t)i + 1, n));
+      strlcpy(l2, text + i + 1, n);
+      if (s.textWidth(l1) <= maxW && s.textWidth(l2) <= maxW) return true;
+    }
+  }
+  return false;
+}
+
 // Draw text left-aligned at (x, cy), shrinking the font and finally
 // truncating with "..." so it never runs past maxW.
 void drawFittedText(TFT_eSprite& s, const char* text, int x, int cy, int maxW) {
@@ -245,11 +258,20 @@ void drawRowSlot(int slot) {
 
     int textX = 42;
     int textW = ROW_W - BOX_SIZE - 8 - 6 - textX;
+    char l1[48], l2[48];
+    row.setTextDatum(ML_DATUM);
+    row.setFreeFont(&FreeSansBold9pt7b);
     if (t.time[0]) {
+      // name on top, time underneath
       drawFittedText(row, t.name, textX, 12, textW);
-      row.setTextDatum(ML_DATUM);
       row.setFreeFont(&FreeSans9pt7b);
       row.drawString(t.time, textX, 27);
+    } else if (row.textWidth(t.name) <= textW) {
+      row.drawString(t.name, textX, ROW_H / 2);
+    } else if (splitTwoLines(row, t.name, textW, l1, l2, sizeof(l1))) {
+      // long name: wrap onto two lines
+      row.drawString(l1, textX, 11);
+      row.drawString(l2, textX, 26);
     } else {
       drawFittedText(row, t.name, textX, ROW_H / 2, textW);
     }
@@ -405,6 +427,7 @@ void refresh() {
     haveData = true;
     online = true;
     if (dataChanged || wasOffline) {
+      Serial.printf("Drawing page: %d sections, \"%s\"\n", sectionCount, dateLabel);
       // Keep the current page valid if the list shrank
       if (curSection >= sectionCount) { curSection = 0; curOffset = 0; }
       if (curOffset >= sections[curSection].count) curOffset = 0;
@@ -435,6 +458,7 @@ void setup() {
   if (connectWiFi(20000)) {
     Serial.printf("WiFi connected, IP %s\n", WiFi.localIP().toString().c_str());
     drawStatusScreen("Loading...", "Getting today's list");
+    Serial.println("Drew Loading screen");
   } else {
     Serial.println("WiFi connect failed");
   }

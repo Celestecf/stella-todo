@@ -19,7 +19,16 @@ import { getStore } from "@netlify/blobs";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 const SESSION_DAYS = 30;
-const ICONS = ["toothbrush", "shirt", "cereal", "soccer", "books", "heart", "flower"];
+const ICONS = [
+  "heart", "flower", "toothbrush", "shirt", "cereal", "soccer", "books", "hairbrush",
+  "backpack", "vitamin", "pencil", "homework", "shower", "bath", "bed", "moon",
+  "sun", "clock", "socks", "shoes", "coat", "pajamas", "laundry", "trash",
+  "dishes", "toys", "plant", "water", "milk", "apple", "lunch", "banana",
+  "dog", "cat", "fish", "ballet", "swim", "bike", "piano", "music",
+  "basketball", "tennis", "gymnastics", "dance", "art", "game", "tv", "tablet",
+  "school", "bus", "car", "doctor", "dentist", "gift", "cake", "party",
+  "umbrella", "star", "sparkles", "rainbow", "unicorn", "medal", "smile",
+];
 
 const DEFAULT_CONFIG = {
   sections: [
