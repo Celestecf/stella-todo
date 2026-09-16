@@ -1,0 +1,8 @@
+# Netlify reads this from the repo root. The site lives in portal/.
+[build]
+  base = "portal"
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
