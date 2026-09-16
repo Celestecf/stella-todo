@@ -13,6 +13,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <time.h>
 #include <TFT_eSPI.h>
 #include <XPT2046_Touchscreen.h>
 #include <WiFiSecrets.h>
@@ -57,6 +58,17 @@ const int NAV_Y      = 310;          // centre line of the bottom nav band
 const int NAV_TOP    = 300;          // taps below this line are nav taps
 const unsigned long REFRESH_MS = 60 * 1000;
 
+// ---------- Schedule (local time) ----------
+// POSIX TZ string; must match TIMEZONE on the server. America/New_York:
+const char* TZ_INFO = "EST5EDT,M3.2.0,M11.1.0";
+// Which page to land on, by time of day (minutes since midnight)
+const int AFTER_SCHOOL_MIN = 14 * 60 + 30;   // 2:30 PM -> After School page
+const int BEDTIME_MIN      = 19 * 60;        // 7:00 PM -> Bedtime page
+// Night mode: backlight off between these times, wake on touch
+const int NIGHT_START_MIN  = 20 * 60 + 30;   // 8:30 PM
+const int NIGHT_END_MIN    = 6 * 60;         // 6:00 AM
+const unsigned long WAKE_MS = 60 * 1000;     // how long a touch keeps it awake at night
+
 // ---------- Data ----------
 const int MAX_SECTIONS = 3;
 const int MAX_TASKS    = 12;         // per section
@@ -85,6 +97,12 @@ bool dataChanged = false;     // set by fetchToday() when the list differs from 
 unsigned long lastFetch = 0;
 String lastBody;
 
+// Time-of-day state
+int  lastAutoSection = -1;    // section the schedule last put us on
+int  lastClockMin    = -1;    // minute the header clock was last drawn for
+bool screenOn        = true;
+unsigned long lastTouchMs = 0;
+
 // A "page" is one screen: a section plus an offset into its tasks
 // (sections with more than ROWS_PER_PAGE tasks spill onto extra pages).
 int curSection = 0;
@@ -105,6 +123,32 @@ bool connectWiFi(unsigned long timeoutMs) {
   unsigned long t0 = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - t0 < timeoutMs) delay(100);
   return WiFi.status() == WL_CONNECTED;
+}
+
+// ---------- Time ----------
+// Minutes since local midnight, or -1 if the clock hasn't synced yet
+int minutesNow() {
+  struct tm t;
+  if (!getLocalTime(&t, 0)) return -1;
+  return t.tm_hour * 60 + t.tm_min;
+}
+
+int sectionForMinutes(int m) {
+  int sec = (m < AFTER_SCHOOL_MIN) ? 0 : (m < BEDTIME_MIN) ? 1 : 2;
+  return min(sec, max(sectionCount - 1, 0));
+}
+
+bool isNight(int m) {
+  return (NIGHT_START_MIN > NIGHT_END_MIN)
+       ? (m >= NIGHT_START_MIN || m < NIGHT_END_MIN)   // range wraps midnight
+       : (m >= NIGHT_START_MIN && m < NIGHT_END_MIN);
+}
+
+void setBacklight(bool on) {
+#ifdef TFT_BL
+  digitalWrite(TFT_BL, on ? TFT_BACKLIGHT_ON : !TFT_BACKLIGHT_ON);
+#endif
+  screenOn = on;
 }
 
 // Parse the /api/today JSON into sections[]. Returns false on any problem.
@@ -280,6 +324,24 @@ void drawRowSlot(int slot) {
   row.pushSprite(ROW_X, y);
 }
 
+// Date plus clock (once the clock has synced), between the heart and flower
+void drawDateLine() {
+  char buf[40];
+  struct tm t;
+  if (getLocalTime(&t, 0)) {
+    int h = t.tm_hour % 12; if (h == 0) h = 12;
+    snprintf(buf, sizeof(buf), "%s   %d:%02d %s", dateLabel, h, t.tm_min, t.tm_hour < 12 ? "AM" : "PM");
+    lastClockMin = t.tm_hour * 60 + t.tm_min;
+  } else {
+    strlcpy(buf, dateLabel, sizeof(buf));
+  }
+  tft.fillRect(44, 34, 152, 20, C_HEADER);
+  tft.setTextColor(C_TITLE, C_HEADER);
+  tft.setTextDatum(TC_DATUM);
+  tft.setTextFont(2);
+  tft.drawString(buf, SCREEN_W / 2, 36);
+}
+
 void drawHeader() {
   tft.fillRoundRect(0, -16, SCREEN_W, HEADER_H + 16, 16, C_HEADER);
   tft.pushImage(10, 12, ICON_SIZE, ICON_SIZE, icon_heart, ICON_KEY);
@@ -289,8 +351,7 @@ void drawHeader() {
   tft.setTextDatum(TC_DATUM);
   tft.setFreeFont(&FreeSansBold12pt7b);
   tft.drawString("Stella's Day", SCREEN_W / 2, 8);
-  tft.setFreeFont(&FreeSans9pt7b);
-  tft.drawString(dateLabel, SCREEN_W / 2, 36);
+  drawDateLine();
 
   // Small red dot in the corner when the last sync failed
   if (!online) tft.fillCircle(SCREEN_W - 8, 8, 3, C_ERROR);
@@ -396,6 +457,11 @@ int slotAt(int x, int y) {
 
 void handleTap(int x, int y) {
   Serial.printf("tap (%d,%d)\n", x, y);
+  lastTouchMs = millis();
+  if (!screenOn) {            // first touch at night just wakes the screen
+    setBacklight(true);
+    return;
+  }
   if (!haveData) return;
 
   if (y >= NAV_TOP - 6) {                       // bottom band: page arrows
@@ -457,6 +523,7 @@ void setup() {
   drawStatusScreen("Connecting...", WIFI_SSID);
   if (connectWiFi(20000)) {
     Serial.printf("WiFi connected, IP %s\n", WiFi.localIP().toString().c_str());
+    configTzTime(TZ_INFO, "pool.ntp.org", "time.nist.gov");   // clock syncs in the background
     drawStatusScreen("Loading...", "Getting today's list");
     Serial.println("Drew Loading screen");
   } else {
@@ -474,5 +541,25 @@ void loop() {
   wasTouched = touching;
 
   if (millis() - lastFetch > REFRESH_MS) refresh();
+
+  int m = minutesNow();
+  if (m >= 0) {
+    // Land on the right page when the time of day crosses a boundary
+    int autoSec = sectionForMinutes(m);
+    if (autoSec != lastAutoSection) {
+      lastAutoSection = autoSec;
+      curSection = autoSec;
+      curOffset = 0;
+      if (haveData) drawPage();
+    }
+
+    // Night mode: backlight off after WAKE_MS without a touch
+    bool night = isNight(m);
+    if (night && screenOn && millis() - lastTouchMs > WAKE_MS) setBacklight(false);
+    if (!night && !screenOn) setBacklight(true);
+
+    // Tick the header clock once a minute
+    if (m != lastClockMin && haveData && screenOn) drawDateLine();
+  }
   delay(10);
 }

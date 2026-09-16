@@ -21,6 +21,21 @@ Inland / ESP32-2432S028 "Cheap Yellow Display": ESP32-WROOM-32E, 2.8" ILI9341
 
 Libraries: `TFT_eSPI` (Bodmer), `XPT2046_Touchscreen` (Paul Stoffregen).
 
+## Time-of-day behaviour
+
+The device syncs its clock from the internet (NTP) at boot. Settings are at the
+top of `stella_todo/stella_todo.ino`:
+
+| Setting | Default | What it does |
+|---|---|---|
+| `TZ_INFO` | `EST5EDT,M3.2.0,M11.1.0` (New York) | must match `TIMEZONE` on the server |
+| `AFTER_SCHOOL_MIN` | 2:30 PM | switches to the After School page |
+| `BEDTIME_MIN` | 7:00 PM | switches to the Bedtime page |
+| `NIGHT_START_MIN` / `NIGHT_END_MIN` | 8:30 PM - 6:00 AM | backlight off; a touch wakes it for `WAKE_MS` |
+
+The arrows still work at any time; the schedule only changes the page when a
+boundary is crossed.
+
 ## Portal
 
 See [`portal/README.md`](portal/README.md).
