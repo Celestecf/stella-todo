@@ -1,0 +1,7 @@
+# Netlify / node
+portal/node_modules/
+portal/.netlify/
+portal/.env
+
+# macOS
+.DS_Store

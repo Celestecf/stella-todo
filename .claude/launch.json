@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "portal",
+      "runtimeExecutable": "netlify",
+      "runtimeArgs": ["dev", "--port", "8888", "--no-open"],
+      "cwd": "portal",
+      "port": 8888
+    }
+  ]
+}

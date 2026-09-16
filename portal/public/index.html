@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stella's Day</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Login -->
+  <section id="login" class="screen hidden">
+    <div class="card login-card">
+      <h1><span class="heart">&#10084;</span> Stella's Day</h1>
+      <p class="muted">Parent portal</p>
+      <form id="login-form">
+        <input id="password" type="password" placeholder="Family password" autocomplete="current-password" required>
+        <button type="submit" class="primary">Log in</button>
+        <p id="login-error" class="error hidden"></p>
+      </form>
+    </div>
+  </section>
+
+  <!-- App -->
+  <section id="app" class="screen hidden">
+    <header class="topbar">
+      <h1><span class="heart">&#10084;</span> Stella's Day</h1>
+      <div class="topbar-right">
+        <span id="save-status" class="muted"></span>
+        <button id="logout" class="ghost">Log out</button>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="routine">Daily routine</button>
+      <button class="tab" data-tab="events">One-off events</button>
+      <button class="tab" data-tab="today">Today</button>
+    </nav>
+
+    <!-- Routine -->
+    <main id="tab-routine" class="tab-panel">
+      <p class="muted">These repeat every week on the days you pick. Stella's screen has one page per section.</p>
+      <div id="sections"></div>
+    </main>
+
+    <!-- Events -->
+    <main id="tab-events" class="tab-panel hidden">
+      <p class="muted">One-time items like practices, appointments, or special reminders. They show up on Stella's screen only on that day.</p>
+      <div class="card">
+        <h2>Add an event</h2>
+        <form id="event-form" class="event-form">
+          <input id="ev-name" type="text" placeholder="Soccer practice" maxlength="40" required>
+          <input id="ev-date" type="date" required>
+          <input id="ev-time" type="text" placeholder="4:00 PM" maxlength="12">
+          <select id="ev-section"></select>
+          <select id="ev-icon"></select>
+          <button type="submit" class="primary">Add</button>
+        </form>
+      </div>
+      <div class="card">
+        <div class="row-between">
+          <h2>Upcoming</h2>
+          <label class="muted small"><input id="show-past" type="checkbox"> show past</label>
+        </div>
+        <div id="events-list"></div>
+      </div>
+    </main>
+
+    <!-- Today -->
+    <main id="tab-today" class="tab-panel hidden">
+      <div class="row-between">
+        <p class="muted">What Stella's screen shows, and what she's checked off.</p>
+        <input id="today-date" type="date">
+      </div>
+      <div id="today-view"></div>
+    </main>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
