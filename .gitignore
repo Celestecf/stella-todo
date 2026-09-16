@@ -5,3 +5,7 @@ portal/.env
 
 # macOS
 .DS_Store
+
+# Secrets for the device firmware
+stella_todo/.device_key.txt
+stella_todo/secrets.h
